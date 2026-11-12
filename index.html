@@ -187,15 +187,17 @@ function defaultData(){
   c('Moradia','despesa','essencial','#2563eb'),c('Contas da casa','despesa','essencial','#3b82f6'),c('Mercado','despesa','essencial','#0ea5e9'),c('Transporte','despesa','essencial','#06b6d4'),c('Saúde','despesa','essencial','#14b8a6'),c('Educação','despesa','essencial','#6366f1'),
   c('Restaurantes','despesa','estilo','#f97316'),c('Lazer','despesa','estilo','#f59e0b'),c('Compras','despesa','estilo','#ec4899'),c('Assinaturas','despesa','estilo','#a855f7'),c('Viagens','despesa','estilo','#ef4444'),c('Cuidados pessoais','despesa','estilo','#d946ef'),c('Outros','despesa','estilo','#94a3b8'),
   c('Investimentos','despesa','investimento','#F2A516')
- ],lanc:[],fixos:[],invest:[],bens:[],dividas:[]};
+ ],lanc:[],fixos:[],invest:[],bens:[],dividas:[],v:2};
 }
 let S=null;
 try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 if(!S||!Array.isArray(S.cats))S=defaultData();
 ['contas','cartoes','cats','lanc','fixos','invest','bens','dividas'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});
 function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
+function migrar(){if(S.v>=2)return;S.cartoes.forEach(k=>{if(+k.venc<=+k.fech)S.lanc.forEach(l=>{if(l.cartao!==k.id)return;if(l.fat)l.fat=addMonths(l.fat,1);if(l.tipo==='pagfat'&&l.fatura)l.fatura=addMonths(l.fatura,1)})});S.v=2;save()}
 
 let tab='dashboard', mes=MES_HOJE;
+migrar();
 const cat=id=>S.cats.find(c=>c.id===id)||{nome:'Sem categoria',cor:'#cbd5e1',grupo:'estilo',tipo:'despesa'};
 const conta=id=>S.contas.find(c=>c.id===id);
 const cartao=id=>S.cartoes.find(c=>c.id===id);
@@ -218,11 +220,12 @@ function saldoConta(id){
   else if(l.tipo==='pagfat'&&l.conta===id)s-=l.valor;}
  return s;
 }
-function mesFatura(l){if(l.fat)return l.fat;const k=cartao(l.cartao);if(!k)return ym(l.data);return +l.data.slice(8,10)>=(+k.fech||1)?addMonths(ym(l.data),1):ym(l.data)}
+function mesFatura(l){if(l.fat)return l.fat;const k=cartao(l.cartao);if(!k)return ym(l.data);const f=+k.fech||1,v=+k.venc||10;const cm=+l.data.slice(8,10)>=f?addMonths(ym(l.data),1):ym(l.data);return v>f?cm:addMonths(cm,1)}
 function fatura(id,m){const itens=S.lanc.filter(l=>l.tipo==='despesa'&&l.cartao===id&&mesFatura(l)===m).sort((a,b)=>a.data<b.data?-1:1);
  const total=sum(itens);const pago=sum(S.lanc.filter(l=>l.tipo==='pagfat'&&l.cartao===id&&l.fatura===m));return{itens,total,pago,aberto:Math.max(0,total-pago)}}
 function devedorCartao(id){return Math.max(0,sum(S.lanc.filter(l=>l.tipo==='despesa'&&l.cartao===id))-sum(S.lanc.filter(l=>l.tipo==='pagfat'&&l.cartao===id)))}
-function vencFatura(k,m){const f=+k.fech||1,v=+k.venc||10;const mv=v>f?m:addMonths(m,1);return mv+'-'+pad(Math.min(v,28))}
+function vencFatura(k,m){const v=+k.venc||10;return m+'-'+pad(Math.min(v,new Date(+m.slice(0,4),+m.slice(5,7),0).getDate()))}
+function fechFatura(k,m){const f=+k.fech||1,v=+k.venc||10;const cm=v>f?m:addMonths(m,-1);return cm+'-'+pad(Math.min(f,new Date(+cm.slice(0,4),+cm.slice(5,7),0).getDate()))}
 function patrimonio(){
  const contas=sum(S.contas,c=>saldoConta(c.id)),inv=sum(S.invest,i=>i.atual),bens=sum(S.bens,b=>b.valor),div=sum(S.dividas,d=>d.saldo),cart=sum(S.cartoes,k=>devedorCartao(k.id));
  return{contas,inv,bens,div,cart,ativos:contas+inv+bens,passivos:div+cart,liquido:contas+inv+bens-div-cart};
@@ -312,7 +315,7 @@ const acoes=(col,id)=>`<button class="ic" title="Editar" onclick="editItem('${co
 let D=null;
 function novoLanc(id,preset){
  const ed=id?S.lanc.find(l=>l.id===id):null;
- D=ed?{...ed,valor:fmtNum(ed.valor)}:Object.assign({tipo:'despesa',data:mes===MES_HOJE?HOJE:mes+'-01',desc:'',valor:'',cat:'',parcelas:1,destino:''},preset||{});
+ D=ed?{...ed,valor:fmtNum(ed.valor)}:Object.assign({tipo:'despesa',data:HOJE,desc:'',valor:'',cat:'',parcelas:1,destino:''},preset||{});
  D.forma=ed?(ed.cartao?'k:'+ed.cartao:(ed.conta?'c:'+ed.conta:'')):(D.forma??(S.contas[0]?'c:'+S.contas[0].id:''));
  D._id=id||null;
  openModal(ed?'Editar lançamento':'Novo lançamento',lancForm(),salvarLanc,'Salvar');
@@ -423,9 +426,9 @@ function pgCartoes(){
  h+=`<div class="grid g4">${kpi('Limite total',brl(lim))}${kpi('Limite utilizado',brl(usado),lim?pct(usado/lim)+' do limite':'','neg')}${kpi('Limite disponível',brl(lim-usado),'','pos')}${kpi('Faturas do mês',brl(fm))}</div>`;
  h+=S.cartoes.map(k=>{const f=fatura(k.id,mes),dev=devedorCartao(k.id),u=k.limite?dev/k.limite:0;const fut=ultimos(addMonths(mes,6),6).map(m=>fatura(k.id,m).total);
   return`<div class="grid g12"><div><div class="ccard" style="background:linear-gradient(135deg,${k.cor||'#333'},#1d1d1f)"><div class="row" style="padding:0"><span class="n">${esc(k.nome)}</span><span>${acoes('cartoes',k.id).replace(/class="ic"/g,'class="ic" style="color:#fff"')}</span></div><div><div class="x">Disponível</div><div style="font-size:20px;font-weight:700">${brl((k.limite||0)-dev)}</div><div class="x">de ${brl(k.limite)} · fecha dia ${k.fech} · vence dia ${k.venc}</div></div></div>
-   <div class="card" style="margin-top:10px">${barra(u,u>.9?'#dc2626':u>.7?'#F2A516':'#16a34a')}<div class="row" style="font-size:12.5px"><span class="mu">Usado ${pct(u)}</span><span>${brl(dev)}</span></div><div style="margin-top:8px"><b style="font-size:12.5px">Próximas faturas</b>${fut.map((v,i)=>`<div class="row" style="padding:2px 0;font-size:12.5px"><span class="mu">${mesCurto(addMonths(mes,i+1))}</span><span>${brl(v)}</span></div>`).join('')}</div></div></div>
+   <div class="card" style="margin-top:10px">${barra(u,u>.9?'#dc2626':u>.7?'#F2A516':'#16a34a')}<div class="row" style="font-size:12.5px"><span class="mu">Usado ${pct(u)}</span><span>${brl(dev)}</span></div><div style="margin-top:8px"><b style="font-size:12.5px">Próximas faturas</b>${fut.map((v,i)=>`<div class="row" style="padding:2px 0;font-size:12.5px;cursor:pointer" title="Ver esta fatura" onclick="mes='${addMonths(mes,i+1)}';render()"><span class="mu" style="text-decoration:underline dotted">${mesCurto(addMonths(mes,i+1))}</span><span>${brl(v)}</span></div>`).join('')}</div></div></div>
    <div class="card"><h3><span>Fatura ${mesLongo(mes)} · vence ${fmtDate(vencFatura(k,mes))}</span><span style="display:flex;gap:8px;align-items:center">${f.total?(f.aberto<0.01?`<span class="tag ok">✓ Paga</span><button class="btn sm" onclick="desmarcarPaga('${k.id}','${mes}')">Desfazer</button>`:`<span class="tag wa">${f.pago>0?'Falta ':'Em aberto '}${brl(f.aberto)}</span><button class="btn sm" onclick="pagarFatura('${k.id}')" title="Escolher conta, data ou valor parcial">Outro valor…</button><button class="btn sm p" onclick="marcarPaga('${k.id}','${mes}')">✓ Já paguei</button>`):''}</span></h3>
-   <div class="row"><span class="mu">Total da fatura</span><b style="font-size:18px">${brl(f.total)}</b></div>${lancTable(f.itens)}</div></div>`}).join('');
+   <div class="row"><span class="mu">Total da fatura <span style="font-size:12px">· ${cicloTxt(k,mes)}</span></span><b style="font-size:18px">${brl(f.total)}</b></div>${f.itens.length?lancTable(f.itens):outrasFaturas(k)}</div></div>`}).join('');
  return h;
 }
 function marcarPaga(id,m){const k=cartao(id),f=fatura(id,m);if(!(f.aberto>0))return;
@@ -436,6 +439,10 @@ function marcarPaga(id,m){const k=cartao(id),f=fatura(id,m);if(!(f.aberto>0))ret
 function desmarcarPaga(id,m){S.lanc=S.lanc.filter(l=>!(l.tipo==='pagfat'&&l.cartao===id&&l.fatura===m));save();render();toast('Pagamento da fatura desfeito.')}
 function toast(msg,undo){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}
  t.innerHTML=esc(msg)+(undo?' <button id="toastU">Desfazer</button>':'');t.className='show';if(undo)$('#toastU').onclick=()=>{t.className='';undo()};clearTimeout(t._h);t._h=setTimeout(()=>t.className='',5000)}
+function cicloTxt(k,m){const ini=fechFatura(k,addMonths(m,-1)),fim=fechFatura(k,m);const d=new Date(+fim.slice(0,4),+fim.slice(5,7)-1,+fim.slice(8,10)-1);return`compras de ${fmtDate(ini).slice(0,5)} a ${pad(d.getDate())}/${pad(d.getMonth()+1)}`}
+function outrasFaturas(k){const g={};S.lanc.filter(l=>l.tipo==='despesa'&&l.cartao===k.id).forEach(l=>{const m=mesFatura(l);g[m]=(g[m]||0)+l.valor});
+ const ms=Object.keys(g).sort();if(!ms.length)return'<div class="empty">Nenhum lançamento neste cartão ainda.</div>';
+ return`<div class="empty">Nenhum lançamento nesta fatura.<br><br>Os lançamentos deste cartão estão em:<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px">${ms.map(m=>`<button class="btn sm" onclick="mes='${m}';render()">Fatura ${mesCurto(m)} · ${brl(g[m])}</button>`).join('')}</div><div class="hint" style="margin-top:10px">A fatura de cada compra depende da <b>data</b> dela e do dia de fechamento do cartão. Se alguma estiver no mês errado, abra-a e corrija a data.</div></div>`}
 function pagarFatura(id){const k=cartao(id),f=fatura(id,mes);if(!S.contas.length){openModal('Pagar fatura','<p>Cadastre uma conta na aba Contas para registrar o pagamento.</p>',null);return}
  openModal('Pagar fatura · '+k.nome,`<div class="fld"><label>Pagar com</label><select id="pf_c">${S.contas.map(c=>`<option value="${c.id}">${esc(c.nome)} (saldo ${brl(saldoConta(c.id))})</option>`).join('')}</select></div><div class="f2"><div class="fld"><label>Data</label><input id="pf_d" type="date" value="${vencFatura(k,mes)<HOJE?HOJE:vencFatura(k,mes)}"></div><div class="fld"><label>Valor (R$)</label><input id="pf_v" inputmode="decimal" value="${fmtNum(Math.round(f.aberto*100)/100)}"></div></div>`,()=>{
   const v=parseNum($('#pf_v').value);if(!(v>0))return erro('Informe o valor.');
@@ -552,7 +559,7 @@ function render(){
 /* ================= backup ================= */
 function baixar(nome,conteudo,tipo){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([conteudo],{type:tipo}));a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
 function exportar(){baixar('wealthfin-backup-'+HOJE+'.json',JSON.stringify(S,null,1),'application/json')}
-function importar(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.cats))throw 0;S=d;['contas','cartoes','cats','lanc','fixos','invest','bens','dividas'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});save();render();openModal('Backup','<p style="margin:0">Backup importado com sucesso.</p>',null)}catch(e){openModal('Backup','<p style="margin:0">Arquivo inválido.</p>',null)}inp.value=''};r.readAsText(f)}
+function importar(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.cats))throw 0;S=d;['contas','cartoes','cats','lanc','fixos','invest','bens','dividas'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});migrar();save();render();openModal('Backup','<p style="margin:0">Backup importado com sucesso.</p>',null)}catch(e){openModal('Backup','<p style="margin:0">Arquivo inválido.</p>',null)}inp.value=''};r.readAsText(f)}
 function apagarTudo(){confirmar('Apagar TODOS os dados do WealthFin neste navegador? Faça um backup antes, se quiser guardar.',()=>{S=defaultData();save();render()})}
 function carregarExemplo(){
  const go_=()=>{gerarExemplo();save();tab='dashboard';mes=MES_HOJE;render()};
