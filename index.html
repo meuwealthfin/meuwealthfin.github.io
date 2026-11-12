@@ -16,6 +16,17 @@ aside{width:224px;flex-shrink:0;background:#fff;border-right:1px solid var(--bd)
 .logo i svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.4}
 .btn-new{background:var(--or);color:#fff;border:0;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;margin-bottom:14px;width:100%}
 .btn-new:hover{background:var(--or2)}
+.btn-imp{background:#fff;color:var(--or2);border:1px solid var(--or);border-radius:8px;padding:8px;font-weight:600;cursor:pointer;margin:-6px 0 14px;width:100%}
+.btn-imp:hover{background:#fff8e8}
+.modal.wide{max-width:980px}
+.drop{display:block;border:2px dashed #e3c98a;background:#fffbf2;border-radius:12px;padding:22px;text-align:center;cursor:pointer;margin-bottom:12px}
+.drop.on{background:#fff1cf;border-color:var(--or)}
+.drop .mu{font-size:12.5px;margin-top:4px}
+table.imp td{padding:4px 4px}
+table.imp input,table.imp select{border:1px solid var(--bd);border-radius:6px;padding:5px 6px;background:#fff;width:100%;font-size:13px}
+table.imp input[type=checkbox]{width:auto}
+table.imp tr.off td{opacity:.45}
+.st{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--sel);margin-bottom:10px}
 nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:#333;text-decoration:none;cursor:pointer;margin-bottom:2px;white-space:nowrap}
 nav a:hover{background:#f7f7f8}
 nav a.on{background:var(--sel);font-weight:600}
@@ -98,6 +109,7 @@ tr:last-child td{border-bottom:0}
 .hint{font-size:12px;color:var(--mu);margin-top:-4px;margin-bottom:10px}
 @media (max-width:1100px){.g5{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:1fr 1fr}.g21,.g12,.g3{grid-template-columns:1fr}}
 @media (max-width:820px){
+ .btn-imp{width:auto;margin:0;padding:7px 10px;white-space:nowrap}
  .app{flex-direction:column}
  aside{width:100%;height:auto;position:sticky;top:0;z-index:10;flex-direction:row;align-items:center;gap:8px;padding:8px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--bd)}
  .logo{padding:0 6px}.logo span{display:none}
@@ -114,6 +126,7 @@ tr:last-child td{border-bottom:0}
  <aside>
   <div class="logo"><i><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/></svg></i><span>WealthFin</span></div>
   <button class="btn-new" onclick="novoLanc()">+ Novo Lançamento</button>
+  <button class="btn-imp" onclick="abrirImport()">📎 Importar PDF / print</button>
   <nav id="nav"></nav>
   <div class="side-foot">
    <button onclick="exportar()">⬇ Exportar backup</button>
@@ -202,7 +215,7 @@ function saldoConta(id){
   else if(l.tipo==='pagfat'&&l.conta===id)s-=l.valor;}
  return s;
 }
-function mesFatura(l){const k=cartao(l.cartao);if(!k)return ym(l.data);return +l.data.slice(8,10)>=(+k.fech||1)?addMonths(ym(l.data),1):ym(l.data)}
+function mesFatura(l){if(l.fat)return l.fat;const k=cartao(l.cartao);if(!k)return ym(l.data);return +l.data.slice(8,10)>=(+k.fech||1)?addMonths(ym(l.data),1):ym(l.data)}
 function fatura(id,m){const itens=S.lanc.filter(l=>l.tipo==='despesa'&&l.cartao===id&&mesFatura(l)===m).sort((a,b)=>a.data<b.data?-1:1);
  const total=sum(itens);const pago=sum(S.lanc.filter(l=>l.tipo==='pagfat'&&l.cartao===id&&l.fatura===m));return{itens,total,pago,aberto:Math.max(0,total-pago)}}
 function devedorCartao(id){return Math.max(0,sum(S.lanc.filter(l=>l.tipo==='despesa'&&l.cartao===id))-sum(S.lanc.filter(l=>l.tipo==='pagfat'&&l.cartao===id)))}
@@ -247,10 +260,10 @@ function openModal(title,body,onOk,okLabel='Salvar',extra=null){
  $('#mf').innerHTML=`<button class="btn" onclick="closeModal()">Cancelar</button>${extra?`<button class="btn d" onclick="_extra.fn()">${esc(extra.label)}</button>`:''}${onOk?`<button class="btn p" onclick="if(_ok()!==false)closeModal()">${esc(okLabel)}</button>`:''}`;
  $('#ov').classList.remove('hide');const f=$('#mbody input:not([type=hidden]),#mbody select');if(f&&window.innerWidth>820)f.focus();
 }
-function closeModal(){$('#ov').classList.add('hide');_ok=null;_extra=null}
+function closeModal(){$('#ov').classList.add('hide');$('.modal').classList.remove('wide');_ok=null;_extra=null;if(window.IMP)IMP.open=false}
 function erro(msg){$('#merr').textContent=msg;return false}
 function confirmar(msg,fn,extra){openModal('Confirmar',`<p style="margin:0">${esc(msg)}</p>`,()=>{fn();return true},'Excluir',extra)}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if(e.key==='Enter'&&!$('#ov').classList.contains('hide')&&e.target.tagName==='INPUT'&&_ok){if(_ok()!==false)closeModal()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if(e.key==='Enter'&&!(window.IMP&&IMP.open)&&!$('#ov').classList.contains('hide')&&e.target.tagName==='INPUT'&&_ok){if(_ok()!==false)closeModal()}});
 
 /* ================= formulários genéricos ================= */
 const formaOpts=(soContas=false,vazio=true)=>(vazio?[['','— sem conta —']]:[]).concat(S.contas.map(c=>['c:'+c.id,'Conta · '+c.nome])).concat(soContas?[]:S.cartoes.map(k=>['k:'+k.id,'Cartão · '+k.nome]));
@@ -340,9 +353,9 @@ function delLanc(id){const l=S.lanc.find(x=>x.id===id);if(!l)return;
  confirmar(l.parc?`Excluir só a parcela ${l.parc.i}/${l.parc.n} ou todas?`:'Excluir este lançamento?',()=>{S.lanc=S.lanc.filter(x=>x.id!==id);save();render()},extra)}
 function formaTxt(l){if(l.tipo==='transf')return`${esc(conta(l.conta)?.nome||'?')} → ${esc(conta(l.destino)?.nome||'?')}`;if(l.tipo==='pagfat')return`${esc(conta(l.conta)?.nome||'—')} → ${esc(cartao(l.cartao)?.nome||'?')}`;if(l.cartao)return'💳 '+esc(cartao(l.cartao)?.nome||'Cartão');return esc(conta(l.conta)?.nome||'—')}
 function lancRow(l,acts=true){
- const c=cat(l.cat);const neg=l.tipo==='despesa'||l.tipo==='pagfat';const cls=l.tipo==='receita'?'pos':neg?'neg':'mu';
+ const c=cat(l.cat);const est=l.tipo==='despesa'&&l.valor<0;const neg=(l.tipo==='despesa'||l.tipo==='pagfat')&&!est;const cls=l.tipo==='receita'||est?'pos':neg?'neg':'mu';
  const cn=l.tipo==='transf'?'<span class="mu">Transferência</span>':l.tipo==='pagfat'?'<span class="mu">Pagamento de fatura</span>':`<span class="dot" style="background:${c.cor}"></span>${esc(c.nome)}`;
- return`<tr><td class="mu" style="white-space:nowrap">${fmtDate(l.data)}</td><td>${esc(l.desc)}</td><td style="white-space:nowrap">${cn}</td><td class="mu" style="white-space:nowrap">${formaTxt(l)}</td><td class="r ${cls}"><b>${l.tipo==='receita'?'+':neg?'−':''} ${brl(l.valor)}</b></td>${acts?`<td class="r"><button class="ic" title="Editar" onclick="novoLanc('${l.id}')">✎</button><button class="ic" title="Excluir" onclick="delLanc('${l.id}')">🗑</button></td>`:''}</tr>`;
+ return`<tr><td class="mu" style="white-space:nowrap">${fmtDate(l.data)}</td><td>${esc(l.desc)}</td><td style="white-space:nowrap">${cn}</td><td class="mu" style="white-space:nowrap">${formaTxt(l)}</td><td class="r ${cls}"><b>${l.tipo==='receita'||est?'+':neg?'−':''} ${brl(Math.abs(l.valor))}</b></td>${acts?`<td class="r"><button class="ic" title="Editar" onclick="novoLanc('${l.id}')">✎</button><button class="ic" title="Excluir" onclick="delLanc('${l.id}')">🗑</button></td>`:''}</tr>`;
 }
 const lancTable=(rows,acts=true)=>rows.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta / Cartão</th><th class="r">Valor</th>${acts?'<th></th>':''}</tr></thead><tbody>${rows.map(l=>lancRow(l,acts)).join('')}</tbody></table></div>`:'<div class="empty">Nenhum lançamento encontrado.</div>';
 const sortDesc=a=>a.slice().sort((x,y)=>x.data<y.data?1:x.data>y.data?-1:0);
@@ -379,7 +392,7 @@ function pgExtrato(){
  <select onchange="F.cat=this.value;$('#extT').innerHTML=extTable()">${opts([['','Todas as categorias']].concat(S.cats.map(c=>[c.id,c.nome])),F.cat)}</select>
  <select onchange="F.forma=this.value;$('#extT').innerHTML=extTable()">${opts([['','Todas as contas/cartões']].concat(formaOpts(false,false)),F.forma)}</select>
  <label style="display:flex;gap:6px;align-items:center;color:var(--mu)"><input type="checkbox"${F.todos?' checked':''} onchange="F.todos=this.checked;$('#extT').innerHTML=extTable()"> Todos os meses</label>
- <button class="btn" onclick="exportCSV()">Exportar CSV</button></div><div id="extT">${extTable()}</div></div>`;
+ <button class="btn" onclick="exportCSV()">Exportar CSV</button><button class="btn p" onclick="abrirImport()">📎 Importar fatura / extrato</button></div><div id="extT">${extTable()}</div></div>`;
 }
 function extFiltrados(){const q=F.q.toLowerCase();return sortDesc(S.lanc.filter(l=>(F.todos||ym(l.data)===mes)&&(!F.tipo||l.tipo===F.tipo)&&(!F.cat||l.cat===F.cat)&&(!F.forma||(F.forma[0]==='c'?(l.conta===F.forma.slice(2)||l.destino===F.forma.slice(2)):l.cartao===F.forma.slice(2)))&&(!q||l.desc.toLowerCase().includes(q))))}
 function extTable(){const rows=extFiltrados();const r=sum(rows.filter(l=>l.tipo==='receita')),d=sum(rows.filter(l=>l.tipo==='despesa'));
@@ -567,5 +580,171 @@ function gerarExemplo(){
 const h0=(location.hash||'').slice(1);if(PAGES[h0])tab=h0;
 render();
 </script>
+<script>
+/* ================= importação de PDF / prints ================= */
+var IMP=null;
+const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+const MESN={jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+const REGRAS=[
+ [/mercado ?livre|mercadolivre|amazon(?! prime)|shopee|shein|magalu|magazine luiza|americanas|renner|riachuelo|c&a|zara|centauro|netshoes|aliexpress|kabum|casas bahia|leroy|tok ?stok|decathlon/,'Compras'],
+ [/ifood|rappi|restaurante|lanchonete|padaria|pizza|burger|mc ?donald|bk |starbucks|cafeteria|\bcafe\b|churrasc|sushi|bar e |\bbar\b|choperia|outback|madero|subway|habib/,'Restaurantes'],
+ [/uber|\b99\b|99app|99 pop|cabify|posto|shell|ipiranga|petrobras|combust|estacion|sem parar|veloe|conectcar|pedagio|metro|bilhete unico|onibus/,'Transporte'],
+ [/supermerc|mercado|carrefour|pao de acucar|assai|atacad|hortifruti|sams club|oba |zaffari|savegnago|big bompreco|guanabara|sonda|st marche|dia brasil/,'Mercado'],
+ [/farmacia|drogaria|droga|raia|pacheco|panvel|pague menos|hospital|clinica|laborat|unimed|amil|sulamerica|bradesco saude|dentista|odonto|consulta|medic/,'Saúde'],
+ [/netflix|spotify|amazon prime|prime video|disney|hbo|youtube|apple\.com|icloud|google one|globoplay|deezer|chatgpt|openai|anthropic|claude\.ai|microsoft|adobe|canva|paramount|crunchyroll|assinatura/,'Assinaturas'],
+ [/cinema|cinemark|ingresso|sympla|eventim|steam|playstation|xbox|nintendo|teatro|show|parque/,'Lazer'],
+ [/airbnb|booking|latam|\bgol\b|azul linhas|voeazul|decolar|hotel|hoteis|pousada|123milhas|maxmilhas|localiza|movida|unidas/,'Viagens'],
+ [/enel|light s|sabesp|copasa|cemig|copel|celesc|comgas|naturgy|vivo|claro|\btim\b|\boi\b|net servicos|internet|energia|\bagua\b|\bgas\b/,'Contas da casa'],
+ [/aluguel|condominio|iptu|quintoandar|imobiliaria/,'Moradia'],
+ [/escola|colegio|faculdade|universidade|curso|udemy|alura|coursera|livraria|amazon kindle|material escolar/,'Educação'],
+ [/academia|smart ?fit|bluefit|bodytech|gympass|wellhub|totalpass|barbearia|salao|cabeleireir|estetica|manicure|perfumaria|boticario|natura|sephora/,'Cuidados pessoais'],
+ [/salario|folha de pagamento|pagamento de salario|proventos|remuneracao mensal/,'Salário'],
+ [/rendiment|juros sobre|dividendo|jcp|remuneracao (da )?conta/,'Rendimentos'],
+ [/tesouro|\bcdb\b|\blci\b|\blca\b|aplicacao|corretora|xp invest|btg|nuinvest|\brico\b|\bclear\b|previdencia|aporte/,'Investimentos'],
+];
+function chave(d){return norm(d).replace(/\(?\d+\s*\/\s*\d+\)?/g,' ').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim().slice(0,14)}
+function guessCat(desc,tipo){
+ const k=chave(desc);
+ if(k.length>=3){const h=sortDesc(S.lanc).find(l=>l.cat&&l.tipo===tipo&&chave(l.desc)===k);if(h)return h.cat}
+ const n=norm(desc);
+ for(const[re,nome]of REGRAS)if(re.test(n)){const c=S.cats.find(c=>c.nome===nome&&c.tipo===tipo);if(c)return c.id}
+ return'';
+}
+function parseLinhas(lines){
+ const out=[];
+ for(const raw of lines){
+  const t=String(raw).replace(/\s+/g,' ').trim();if(t.length<6)continue;
+  const n=norm(t);
+  if(/\b(saldo|total|subtotal|limite|resumo|valor minimo|pagamento minimo|vencimento|melhor dia|taxa de juros|cet|proxima fatura|fatura anterior)\b/.test(n))continue;
+  const cands=[];
+  const r1=/(^|[^\d,.])(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{4}|\d{2}))?(?![\d,])/.exec(t);
+  if(r1){const d=+r1[2],m=+r1[3];if(d>=1&&d<=31&&m>=1&&m<=12)cands.push({i:r1.index+r1[1].length,l:r1[0].length-r1[1].length,d,m,y:r1[4]?(r1[4].length===2?2000+ +r1[4]:+r1[4]):null})}
+  const r2=/(^|[^a-z\d])(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\.?(?:\s*(?:de\s*)?(\d{4}))?(?![a-z])/i.exec(t);
+  if(r2){const d=+r2[2];if(d>=1&&d<=31)cands.push({i:r2.index+r2[1].length,l:r2[0].length-r2[1].length,d,m:MESN[r2[3].toLowerCase()],y:r2[4]?+r2[4]:null})}
+  if(!cands.length)continue;
+  const dt=cands.sort((a,b)=>a.i-b.i)[0];
+  const re=/(?:(-|−)\s?)?(?:R\$|US\$)?\s?(-|−)?(\d{1,3}(?:\.\d{3})+|\d+),(\d{2})(?!\d)(\s?(-|D\b|C\b))?/g;let vm=null,m;
+  while((m=re.exec(t))){if(m.index>=dt.i+dt.l||m.index+m[0].length<=dt.i)vm=m}
+  if(!vm)continue;
+  const v=parseFloat(vm[3].replace(/\./g,'')+'.'+vm[4]);if(!(v>0)||v>1e7)continue;
+  const neg=!!(vm[1]||vm[2]||vm[6]==='-'||vm[6]==='D');
+  const spans=[[dt.i,dt.l],[vm.index,vm[0].length]].sort((a,b)=>b[0]-a[0]);let desc=t;
+  spans.forEach(([i,l])=>{desc=desc.slice(0,i)+' '+desc.slice(i+l)});
+  desc=desc.replace(/R\$|US\$/g,' ').replace(/\s+/g,' ').replace(/^[\s\-–:|*•.]+|[\s\-–:|*•]+$/g,'').trim();
+  if(desc.length<2)continue;
+  out.push({dd:dt.d,mm:dt.m,yy:dt.y,desc,raw:neg?-v:v,sinal:vm[6]==='C'?'C':vm[6]==='D'?'D':''});
+ }
+ return out;
+}
+function impClass(){
+ const isK=IMP.dest[0]==='k',id=IMP.dest.slice(2),ref=isK?IMP.fat:mes;
+ const ry=+ref.slice(0,4),rm=+ref.slice(5,7);
+ IMP.items.forEach((it,ix)=>{
+  let y=it.yy||(it.mm>rm?ry-1:ry);it.data=y+'-'+pad(it.mm)+'-'+pad(Math.min(it.dd,new Date(y,it.mm,0).getDate()));
+  const n=norm(it.desc);it.aviso='';it.ok=true;
+  if(isK){
+   it.tipo='despesa';
+   const est=it.raw<0||/estorno|cashback|reembolso|credito de|ajuste a credito/.test(n);
+   it.valor=est?-Math.abs(it.raw):Math.abs(it.raw);
+   if(/pagamento|pgto|pagto/.test(n)&&!/parcela/.test(n)){it.ok=false;it.aviso='Pagamento da fatura (não é gasto)'}
+   else if(est){it.ok=false;it.aviso='Estorno/crédito — se marcar, entra como desconto na fatura'}
+   const p=/(?:parc(?:ela)?\.?\s*)?\b(\d{1,2})\s*\/\s*(\d{1,2})\b/.exec(it.desc);
+   if(p&&+p[1]>=1&&+p[2]>=2&&+p[1]<=+p[2]&&+p[2]<=48){it.parc={i:+p[1],n:+p[2]};if(+p[1]>1)it.data=IMP.fat+'-'+pad(Math.min(it.dd,28))}
+  }else{
+   it.valor=Math.abs(it.raw);
+   const rec=it.sinal==='C'||(!(it.raw<0)&&it.sinal!=='D'&&/receb|salario|credito|rendiment|deposito|estorno|reembolso|resgate|proventos|dividendo/.test(n));
+   it.tipo=rec?'receita':'despesa';
+  }
+  it.cat=guessCat(it.desc,it.tipo);
+  const dup=S.lanc.some(l=>l.data===it.data&&Math.abs(Math.abs(l.valor)-Math.abs(it.valor))<.005&&(isK?l.cartao===id:(l.conta===id&&!l.cartao)));
+  const dupB=IMP.items.slice(0,ix).some(o=>o.data===it.data&&o.valor===it.valor&&o.desc===it.desc);
+  if(dup||dupB){it.ok=false;it.aviso='Possível duplicado — já existe um lançamento igual'}
+ });
+}
+function abrirImport(){
+ if(!S.contas.length&&!S.cartoes.length){openModal('Importar fatura / extrato','<p style="margin:0">Cadastre primeiro uma conta (aba <b>Contas</b>) ou um cartão (aba <b>Cartões</b>) para saber onde lançar.</p>',null);return}
+ IMP={open:true,dest:S.cartoes[0]?'k:'+S.cartoes[0].id:'c:'+S.contas[0].id,fat:mes,items:[],status:'',pend:[]};
+ openModal('Importar fatura / extrato',impForm(),impConfirmar,'Importar selecionados');
+ $('.modal').classList.add('wide');
+}
+const impRender=()=>{if(IMP&&IMP.open)$('#mbody').innerHTML=impForm()};
+function impStatus(t){if(!IMP)return;IMP.status=t;const e=$('#imp_st');if(e){e.style.display=t?'':'none';e.innerHTML=t}}
+function impForm(){
+ const isK=IMP.dest[0]==='k';
+ let h=`<div class="f2"><div class="fld"><label>Lançar em</label><select onchange="IMP.dest=this.value;impClass();impRender()">${formaOpts(false,false).map(([a,b])=>`<option value="${a}"${IMP.dest===a?' selected':''}>${esc(b)}</option>`).join('')}</select></div>
+ ${isK?`<div class="fld"><label>Fatura de (mês)</label><input type="month" value="${IMP.fat}" onchange="if(this.value){IMP.fat=this.value;impClass();impRender()}"></div>`:'<div class="fld"><label>&nbsp;</label><div class="hint" style="margin:8px 0 0">Extrato de conta: débitos viram despesas e créditos viram receitas.</div></div>'}</div>
+ <label class="drop" ondragover="event.preventDefault();this.classList.add('on')" ondragleave="this.classList.remove('on')" ondrop="event.preventDefault();this.classList.remove('on');impArquivos(event.dataTransfer.files)"><input type="file" multiple accept=".pdf,application/pdf,image/*" style="display:none" onchange="impArquivos(this.files);this.value=''"><b>📎 Clique para escolher PDFs ou prints</b><div class="mu">ou arraste os arquivos aqui · no computador, também dá para colar um print com Ctrl+V</div></label>`;
+ if(IMP.pend.length)h+=`<div class="fld"><label>🔒 O PDF “${esc(IMP.pend[0].name)}” tem senha (em faturas, costuma ser parte do CPF)</label><div style="display:flex;gap:8px"><input id="imp_pass" type="password" onkeydown="if(event.key==='Enter')impSenha()"><button class="btn p" onclick="impSenha()">Abrir</button><button class="btn" onclick="IMP.pend.shift();impRender()">Pular</button></div></div>`;
+ h+=`<div id="imp_st" class="st" style="${IMP.status?'':'display:none'}">${IMP.status}</div>`;
+ if(IMP.items.length){
+  h+=`<div class="row" style="flex-wrap:wrap"><span id="imp_sum">${impSum()}</span><span style="display:flex;gap:6px"><button class="btn sm" onclick="IMP.items.forEach(i=>i.ok=true);impRender()">Marcar todos</button><button class="btn sm" onclick="IMP.items.forEach(i=>i.ok=false);impRender()">Desmarcar</button><button class="btn sm d" onclick="IMP.items=[];impStatus('');impRender()">Limpar</button></span></div>
+  <div class="tw" style="max-height:52vh;overflow:auto"><table class="imp"><thead><tr><th></th><th style="width:130px">Data</th><th>Descrição</th><th style="width:170px">Categoria</th>${isK?'':'<th style="width:110px">Tipo</th>'}<th class="r" style="width:110px">Valor (R$)</th><th></th></tr></thead><tbody>${IMP.items.map((it,i)=>`<tr class="${it.ok?'':'off'}" id="imp_r${i}">
+   <td><input type="checkbox"${it.ok?' checked':''} onchange="IMP.items[${i}].ok=this.checked;$('#imp_r${i}').className=this.checked?'':'off';$('#imp_sum').innerHTML=impSum()"></td>
+   <td><input type="date" value="${it.data}" onchange="IMP.items[${i}].data=this.value"></td>
+   <td><input value="${esc(it.desc)}" onchange="IMP.items[${i}].desc=this.value">${it.aviso?`<div class="hint" style="margin:3px 0 0;color:#92400e">${esc(it.aviso)}</div>`:''}</td>
+   <td><select onchange="IMP.items[${i}].cat=this.value">${catOpts(it.tipo).map(([a,b])=>`<option value="${a}"${it.cat===a?' selected':''}>${a?esc(b):'— sem categoria —'}</option>`).join('')}</select></td>
+   ${isK?'':`<td><select onchange="IMP.items[${i}].tipo=this.value;IMP.items[${i}].cat=guessCat(IMP.items[${i}].desc,this.value);impRender()"><option value="despesa"${it.tipo==='despesa'?' selected':''}>Despesa</option><option value="receita"${it.tipo==='receita'?' selected':''}>Receita</option></select></td>`}
+   <td><input style="text-align:right" inputmode="decimal" value="${(+it.valor).toFixed(2).replace('.',',')}" onchange="IMP.items[${i}].valor=parseNum(this.value);$('#imp_sum').innerHTML=impSum()"></td>
+   <td><button class="ic" title="Remover" onclick="IMP.items.splice(${i},1);impRender()">✕</button></td></tr>`).join('')}</tbody></table></div>
+  <div class="hint" style="margin-top:8px">Confira as linhas antes de importar. As categorias que você escolher aqui são lembradas nas próximas importações.</div>`;
+ }
+ return h;
+}
+function impSum(){const s=IMP.items.filter(i=>i.ok);const sc=s.filter(i=>!i.cat).length;return`<b>${s.length}</b> de ${IMP.items.length} selecionados · total <b>${brl(sum(s.filter(i=>i.tipo==='despesa')))}</b>${sum(s.filter(i=>i.tipo==='receita'))?` em despesas · <b class="pos">${brl(sum(s.filter(i=>i.tipo==='receita')))}</b> em receitas`:''}${sc?` · <span style="color:#92400e">${sc} sem categoria</span>`:''}`}
+function loadScript(src){return new Promise((ok,err)=>{const ex=document.querySelector(`script[src="${src}"]`);if(ex&&ex.dataset.ok)return ok();const s=ex||document.createElement('script');s.src=src;s.onload=()=>{s.dataset.ok=1;ok()};s.onerror=()=>err(new Error('Não foi possível carregar o leitor (verifique a internet).'));if(!ex)document.head.appendChild(s)})}
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+async function pdfLib(){await loadScript(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js';return pdfjsLib}
+async function ocr(img,rotulo){
+ await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+ impStatus(`🔎 Lendo ${esc(rotulo)}… (a primeira leitura de imagem baixa o leitor e pode levar ~30s)`);
+ const r=await Tesseract.recognize(img,'por',{logger:m=>{if(m.status==='recognizing text')impStatus(`🔎 Lendo ${esc(rotulo)}… ${Math.round(m.progress*100)}%`)}});
+ return r.data.text.split('\n');
+}
+async function pdfLines(file,password){
+ const lib=await pdfLib();
+ const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),password}).promise;
+ const lines=[];
+ for(let p=1;p<=doc.numPages;p++){
+  impStatus(`📄 Lendo ${esc(file.name)} — página ${p} de ${doc.numPages}…`);
+  const pg=await doc.getPage(p);const tc=await pg.getTextContent();const rows=[];
+  tc.items.forEach(it=>{if(!it.str||!it.str.trim())return;const y=it.transform[5],x=it.transform[4];let r=rows.find(r=>Math.abs(r.y-y)<3);if(!r){r={y,its:[]};rows.push(r)}r.its.push({x,s:it.str})});
+  const pl=rows.sort((a,b)=>b.y-a.y).map(r=>r.its.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ').replace(/\s+/g,' ').trim());
+  if(pl.join('').length<30){const vp=pg.getViewport({scale:2});const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;lines.push(...await ocr(cv,`${file.name} (pág. ${p}, PDF escaneado)`))}
+  else lines.push(...pl);
+ }
+ return lines;
+}
+async function impArquivos(files,password){
+ files=Array.from(files||[]);if(!files.length)return;
+ let novos=0;
+ for(let fi=0;fi<files.length;fi++){const f=files[fi];
+  try{
+   const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name||'');
+   if(!isPdf&&!/^image\//.test(f.type)){impStatus(`⚠️ “${esc(f.name)}” não é PDF nem imagem.`);continue}
+   const lines=isPdf?await pdfLines(f,password):await ocr(f,f.name||'print');
+   const its=parseLinhas(lines);IMP.items.push(...its);novos+=its.length;
+  }catch(e){
+   if(e&&e.name==='PasswordException'){if(password)impStatus('🔒 Senha incorreta. Tente de novo.');IMP.pend=[f].concat(files.slice(fi+1)).concat(IMP.pend.filter(x=>!files.includes(x)));impClass();impRender();return}
+   console.error(e);impStatus(`⚠️ Não consegui ler “${esc(f.name)}”: ${esc(e.message||e)}`);
+  }
+ }
+ if(!IMP||!IMP.open)return;
+ impClass();
+ IMP.status=novos?`✅ ${novos} lançamento(s) encontrados. Revise abaixo e clique em <b>Importar selecionados</b>.`:(IMP.status&&IMP.status.startsWith('⚠️')?IMP.status:'⚠️ Não encontrei lançamentos (linhas com data e valor). Tente outro arquivo ou um print mais nítido.');
+ impRender();
+}
+function impSenha(){const pw=$('#imp_pass').value;if(!pw)return;const fs=IMP.pend.slice();IMP.pend=[];impArquivos([fs[0]],pw).then(()=>{if(fs.length>1&&IMP&&IMP.open&&!IMP.pend.length)impArquivos(fs.slice(1))})}
+function impConfirmar(){
+ const sel=IMP.items.filter(i=>i.ok);if(!sel.length)return erro('Nenhum lançamento selecionado.');
+ const bad=sel.find(i=>!/^\d{4}-\d{2}-\d{2}$/.test(i.data)||!i.valor);if(bad)return erro('Há linha selecionada com data ou valor inválido: '+bad.desc);
+ const isK=IMP.dest[0]==='k',id=IMP.dest.slice(2);
+ sel.forEach(it=>{const l={id:uid(),tipo:it.tipo,data:it.data,valor:Math.round(it.valor*100)/100,desc:it.desc.trim()||cat(it.cat).nome,cat:it.cat,conta:isK?null:id,cartao:isK?id:null,destino:null,imp:1};if(isK)l.fat=IMP.fat;S.lanc.push(l)});
+ save();const n=sel.length,onde=isK?'na fatura '+mesLongo(IMP.fat)+' do cartão '+cartao(id).nome:'na conta '+conta(id).nome;
+ if(isK&&ym(IMP.fat)!==mes)mes=IMP.fat;
+ render();closeModal();openModal('Importação concluída',`<p style="margin:0">✅ ${n} lançamento(s) importado(s) ${esc(onde)}.</p>`,null);return false;
+}
+document.addEventListener('paste',e=>{if(!IMP||!IMP.open)return;const fs=Array.from(e.clipboardData&&e.clipboardData.files||[]).filter(f=>/^image\/|pdf/.test(f.type));if(fs.length){e.preventDefault();impArquivos(fs)}});
+</script>
+
 </body>
 </html>
