@@ -26,6 +26,9 @@ table.imp td{padding:4px 4px}
 table.imp input,table.imp select{border:1px solid var(--bd);border-radius:6px;padding:5px 6px;background:#fff;width:100%;font-size:13px}
 table.imp input[type=checkbox]{width:auto}
 table.imp tr.off td{opacity:.45}
+#toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,120px);background:#1d1d1f;color:#fff;padding:11px 16px;border-radius:10px;font-size:13.5px;z-index:60;transition:transform .25s;max-width:92vw;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+#toast.show{transform:translate(-50%,0)}
+#toast button{background:none;border:0;color:var(--or);font-weight:700;cursor:pointer;margin-left:8px}
 .st{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--sel);margin-bottom:10px}
 nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:#333;text-decoration:none;cursor:pointer;margin-bottom:2px;white-space:nowrap}
 nav a:hover{background:#f7f7f8}
@@ -372,7 +375,7 @@ function pgDashboard(){
  const ms=ultimos(mes,6);
  h+=`<div class="grid g21"><div class="card"><h3>Receitas x Despesas — últimos 6 meses</h3>${bars(ms.map(mesCurto),[{name:'Receitas',color:'#16a34a',values:ms.map(receitas)},{name:'Despesas',color:'#ef4444',values:ms.map(despesas)},{name:'Investimentos',color:'#F2A516',values:ms.map(aportes)}])}</div><div class="card"><h3>Despesas por categoria</h3>${donut(despCat(mes))}</div></div>`;
  const dg=diagnostico();
- const fat=S.cartoes.map(k=>{const f=fatura(k.id,mes);return`<div class="row"><span><span class="dot" style="background:${k.cor||'#555'}"></span>${esc(k.nome)}<div class="mu" style="font-size:12px;margin-left:16px">vence ${fmtDate(vencFatura(k,mes))}</div></span><span style="text-align:right"><b>${brl(f.total)}</b><div>${f.total&&f.aberto<0.01?'<span class="tag ok">Paga</span>':f.total?'<span class="tag wa">Em aberto</span>':''}</div></span></div>`}).join('')||'<div class="empty">Nenhum cartão cadastrado.</div>';
+ const fat=S.cartoes.map(k=>{const f=fatura(k.id,mes);return`<div class="row"><span><span class="dot" style="background:${k.cor||'#555'}"></span>${esc(k.nome)}<div class="mu" style="font-size:12px;margin-left:16px">vence ${fmtDate(vencFatura(k,mes))}</div></span><span style="text-align:right"><b>${brl(f.total)}</b><div style="margin-top:3px">${f.total&&f.aberto<0.01?`<span class="tag ok" style="cursor:pointer" title="Clique para desfazer" onclick="desmarcarPaga('${k.id}','${mes}')">✓ Paga</span>`:f.total?`<button class="btn sm" onclick="marcarPaga('${k.id}','${mes}')">✓ Já paguei</button>`:''}</div></span></div>`}).join('')||'<div class="empty">Nenhum cartão cadastrado.</div>';
  h+=`<div class="grid g3"><div class="card"><h3>Faturas de ${mesLongo(mes)} <button class="btn sm" onclick="go('cartoes')">Ver</button></h3>${fat}</div>
  <div class="card"><h3>Saúde financeira <button class="btn sm" onclick="go('diagnostico')">Detalhes</button></h3><div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">${ring(dg.score,120)}<div style="flex:1;min-width:140px">${dg.ind.slice(0,4).map(i=>`<div class="row" style="padding:3px 0;font-size:12.5px"><span>${i.nome}</span><span class="tag ${i.st}">${i.vtxt}</span></div>`).join('')}</div></div></div>
  <div class="card"><h3>Orçamento do mês <button class="btn sm" onclick="go('orcamento')">Ver</button></h3>${orcResumo()}</div></div>`;
@@ -421,10 +424,18 @@ function pgCartoes(){
  h+=S.cartoes.map(k=>{const f=fatura(k.id,mes),dev=devedorCartao(k.id),u=k.limite?dev/k.limite:0;const fut=ultimos(addMonths(mes,6),6).map(m=>fatura(k.id,m).total);
   return`<div class="grid g12"><div><div class="ccard" style="background:linear-gradient(135deg,${k.cor||'#333'},#1d1d1f)"><div class="row" style="padding:0"><span class="n">${esc(k.nome)}</span><span>${acoes('cartoes',k.id).replace(/class="ic"/g,'class="ic" style="color:#fff"')}</span></div><div><div class="x">Disponível</div><div style="font-size:20px;font-weight:700">${brl((k.limite||0)-dev)}</div><div class="x">de ${brl(k.limite)} · fecha dia ${k.fech} · vence dia ${k.venc}</div></div></div>
    <div class="card" style="margin-top:10px">${barra(u,u>.9?'#dc2626':u>.7?'#F2A516':'#16a34a')}<div class="row" style="font-size:12.5px"><span class="mu">Usado ${pct(u)}</span><span>${brl(dev)}</span></div><div style="margin-top:8px"><b style="font-size:12.5px">Próximas faturas</b>${fut.map((v,i)=>`<div class="row" style="padding:2px 0;font-size:12.5px"><span class="mu">${mesCurto(addMonths(mes,i+1))}</span><span>${brl(v)}</span></div>`).join('')}</div></div></div>
-   <div class="card"><h3><span>Fatura ${mesLongo(mes)} · vence ${fmtDate(vencFatura(k,mes))}</span><span style="display:flex;gap:8px;align-items:center">${f.total?(f.aberto<0.01?'<span class="tag ok">Paga</span>':`<span class="tag wa">Em aberto ${brl(f.aberto)}</span><button class="btn sm p" onclick="pagarFatura('${k.id}')">Pagar fatura</button>`):''}</span></h3>
+   <div class="card"><h3><span>Fatura ${mesLongo(mes)} · vence ${fmtDate(vencFatura(k,mes))}</span><span style="display:flex;gap:8px;align-items:center">${f.total?(f.aberto<0.01?`<span class="tag ok">✓ Paga</span><button class="btn sm" onclick="desmarcarPaga('${k.id}','${mes}')">Desfazer</button>`:`<span class="tag wa">${f.pago>0?'Falta ':'Em aberto '}${brl(f.aberto)}</span><button class="btn sm" onclick="pagarFatura('${k.id}')" title="Escolher conta, data ou valor parcial">Outro valor…</button><button class="btn sm p" onclick="marcarPaga('${k.id}','${mes}')">✓ Já paguei</button>`):''}</span></h3>
    <div class="row"><span class="mu">Total da fatura</span><b style="font-size:18px">${brl(f.total)}</b></div>${lancTable(f.itens)}</div></div>`}).join('');
  return h;
 }
+function marcarPaga(id,m){const k=cartao(id),f=fatura(id,m);if(!(f.aberto>0))return;
+ const ult=sortDesc(S.lanc.filter(l=>l.tipo==='pagfat'&&l.cartao===id&&l.conta&&conta(l.conta)))[0];
+ const ct=ult?ult.conta:(S.contas[0]?S.contas[0].id:null);const v=vencFatura(k,m);
+ S.lanc.push({id:uid(),tipo:'pagfat',data:v<HOJE?v:HOJE,valor:Math.round(f.aberto*100)/100,desc:'Pagamento fatura '+k.nome+' '+mesCurto(m),conta:ct,cartao:id,fatura:m,cat:''});
+ save();render();toast(`Fatura ${k.nome} ${mesCurto(m)} marcada como paga${ct?' (debitada de '+conta(ct).nome+')':''}.`,()=>desmarcarPaga(id,m))}
+function desmarcarPaga(id,m){S.lanc=S.lanc.filter(l=>!(l.tipo==='pagfat'&&l.cartao===id&&l.fatura===m));save();render();toast('Pagamento da fatura desfeito.')}
+function toast(msg,undo){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}
+ t.innerHTML=esc(msg)+(undo?' <button id="toastU">Desfazer</button>':'');t.className='show';if(undo)$('#toastU').onclick=()=>{t.className='';undo()};clearTimeout(t._h);t._h=setTimeout(()=>t.className='',5000)}
 function pagarFatura(id){const k=cartao(id),f=fatura(id,mes);if(!S.contas.length){openModal('Pagar fatura','<p>Cadastre uma conta na aba Contas para registrar o pagamento.</p>',null);return}
  openModal('Pagar fatura · '+k.nome,`<div class="fld"><label>Pagar com</label><select id="pf_c">${S.contas.map(c=>`<option value="${c.id}">${esc(c.nome)} (saldo ${brl(saldoConta(c.id))})</option>`).join('')}</select></div><div class="f2"><div class="fld"><label>Data</label><input id="pf_d" type="date" value="${vencFatura(k,mes)<HOJE?HOJE:vencFatura(k,mes)}"></div><div class="fld"><label>Valor (R$)</label><input id="pf_v" inputmode="decimal" value="${fmtNum(Math.round(f.aberto*100)/100)}"></div></div>`,()=>{
   const v=parseNum($('#pf_v').value);if(!(v>0))return erro('Informe o valor.');
